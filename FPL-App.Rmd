@@ -1,0 +1,335 @@
+---
+title: "FPL Data Explore"
+output: 
+  flexdashboard::flex_dashboard:
+    theme:
+      bg: "#C0F5DE"
+      fg: "#000000"
+      navbar-bg: "#37003c"
+      primary: "#37003c"
+    orientation: rows
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard) # CRAN v0.5.2
+library(shiny)         # CRAN v1.6.0
+library(shinyWidgets)  # CRAN v0.6.0
+library(plotly)        # CRAN v4.9.4.1
+library(scales)        # CRAN v1.1.1
+library(readr)         # CRAN v2.0.0
+
+bslib::bs_themer()
+
+#eval(parse("testing_script.R", encoding = "UTF-8"))
+source("utility_functions.R")
+source("data_prep.R")
+
+                       # creating the reactive values for plots and valueBoxes
+# main df to be filtered ----
+
+ filtered_player_df <- reactive({
+
+   player_df %>%
+      filter(position %in% !!input$position_select) %>% 
+      filter(cost_abbrv >= !!input$cost_range[1] & cost_abbrv <= !!input$cost_range[2]) %>% 
+      filter(team_name %in% !!input$team_select)
+
+  })
+
+# Value Boxes ----
+ player_num <- reactive({
+   
+   req(nrow(filtered_player_df()) > 0)
+   
+   filtered_player_df() %>% 
+     count() %>% 
+     pull()
+     
+ })
+
+ avg_cost <- reactive({
+ 
+   req(nrow(filtered_player_df()) > 0)
+     
+   avg <- filtered_player_df() %>% 
+     summarise(avg = mean(m_cost, na.rm = TRUE)) %>% 
+     pull() 
+   
+    scales::label_number_si(accuracy=0.1)(avg)
+ })
+ 
+
+ avg_points <- reactive({
+   
+   req(nrow(filtered_player_df()) > 0)
+   
+   avg <- filtered_player_df() %>% 
+     summarise(avg = mean(total_points, na.rm = TRUE)) %>% 
+     pull(avg) 
+   
+   scales::label_number_si(accuracy=0.1)(avg)
+   
+ })
+ 
+# Most Valuable Player panel ----
+ mvp_profile <- reactive({
+   req(nrow(filtered_player_df()) > 0)
+   
+   # filter for best value player
+   top_val_player <- filtered_player_df() %>% 
+     arrange(desc(value)) %>% 
+     head(n = 1)
+   
+   # most valuable player details for panel  
+   top_val_player_name <- 
+     top_val_player %>% 
+     pull(web_name)
+   
+   top_val_player_val <-
+     top_val_player %>% 
+     pull(value)
+   
+   top_val_player_png <-
+     top_val_player %>% 
+     pull(photo_png) 
+     
+   top_val_player_details <- 
+     get_one_player_details(PLAYER_URL, top_val_player$id)
+   #
+   difficulty_df = data.frame(rating = 1:5,
+                              colour = as.character(c("#02884e",
+                                                    "rgb(1, 252, 122)",
+                                                    "rgb(231, 231, 231)",
+                                                    "rgb(255, 23, 81)",
+                                                    "rgb(128, 7, 45)")),
+                              stringsAsFactors = FALSE)
+
+   colour_difs <- top_val_player_details$fixtures %>%
+     head(n = 5) %>%
+     select(difficulty) %>%
+     left_join(difficulty_df, by = c("difficulty" = "rating")) %>%
+     pull(colour)
+   
+
+   colour_html <- paste0("<p>", paste('<span style=\"color:',
+                                      colour_difs,
+                                      '\">&#9632;</span>', collapse = ""), "</p>")
+  #
+   
+   return(
+    tagList(
+      br(),
+     wellPanel(
+       HTML("<b> Best value player in selection </b>"),
+       br(),
+       HTML("Name: <b>", top_val_player_name, "</b>"),
+       br(),
+       HTML("Points per £m: <b>", round(top_val_player_val, 2), "</b>"),
+       br(),
+       HTML("Upcoming fixture difficulty: ", colour_html),
+       
+       div(tags$img(src = top_val_player_png), style = "text-align: center;"),
+       style = "padding: 0px;"
+     )
+   ))
+   
+ })
+ 
+```
+
+
+Sidebar {.sidebar data-width=260}
+==========================================================
+
+```{r}
+HTML('<hr style="height:1px; visibility:hidden;" />')
+shinyWidgets::pickerInput(inputId = "position_select",
+              label = "Select player position",
+              choices = c("Goalkeeper", "Defender", "Midfielder",  "Forward"),
+              selected = "Forward",
+              multiple = TRUE)
+
+  shinyWidgets::pickerInput(inputId = "team_select",
+                            label = "Select Team(s)",
+                            choices = unique(player_df$team_name),
+                            selected = unique(player_df$team_name),
+                            options =
+                              list(`actions-box` = TRUE,                       `selected-text-format` = paste0("count > ", length(unique(player_df$team_name)) -1),                                          `count-selected-text` = "All"),
+                            multiple = TRUE)
+
+
+
+  sliderInput("cost_range",
+              label = "Select Cost Range",
+              min = 3.5,
+              max = max(player_df$cost_abbrv, na.rm = TRUE),
+              value = c(min(player_df$cost_abbrv, na.rm = TRUE),max(player_df$cost_abbrv, na.rm = TRUE)),
+              post = "m",
+              step = 0.5
+              )
+
+ renderUI(mvp_profile())
+  
+
+
+```
+
+Player Value
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Number of Players
+```{r}
+renderValueBox({
+valueBox(player_num(), icon = "fa-users")
+})
+```
+
+### Mean Cost
+```{r}
+renderValueBox({
+valueBox(avg_cost(), icon = "fa-pound-sign")
+})
+```
+
+
+### Mean Total Points
+```{r}
+renderValueBox({
+valueBox(avg_points(), icon = "fa-trophy")
+})
+```
+
+
+
+Row
+-----------------------------------------------------------------------
+
+### Player Points by Cost
+
+```{r}
+
+
+#We can estimate the bang for your buck of a FPL selection by dividing their cost by their total number points obtained this season.
+
+
+  player_value_plot <- reactive({
+
+    req(nrow(filtered_player_df()) > 0)
+    
+    filtered_player_df() %>%
+      plot_ly(type = "scatter",
+              mode = "markers",
+              x = ~m_cost,
+              y = ~total_points,
+              #name = ~team_name,
+              text = ~paste("Name: ", web_name),
+              marker = list(size = 10,
+                            color = ~primary,
+                            line = list(color = ~secondary,
+                                        width = 1.5))) %>%
+      layout(xaxis = list(title = 'Cost (£)',
+                          zeroline = TRUE),
+             yaxis = list(title = 'Total Points')
+      )
+
+
+
+  })
+
+  
+  renderPlotly(player_value_plot())
+
+
+
+```
+
+
+Cost Distributions
+============================================================
+
+### Cost Distribution
+
+```{r}
+
+# boxplot generation
+bp <- reactive({
+  
+  req(nrow(filtered_player_df()) > 0)
+  
+  filtered_player_df() %>%
+    as.data.frame() %>%
+    dplyr::group_by(team_name) %>%
+    dplyr::mutate(team_average_cost = mean(m_cost, na.rm = TRUE)) %>%
+    ungroup() %>%
+    ggplot(aes(x = reorder(team_name, team_average_cost), y = m_cost)) +
+    scale_y_continuous(label = label_number_si()) +
+    xlab("") + 
+    ylab("Cost") +
+    geom_boxplot(fill = "#ADDCC8") +
+    coord_flip() +
+    theme_minimal()
+})
+
+bp_plotly <- reactive({
+  
+  fig <- plotly_build(bp())
+  
+  fig$data <- lapply(fig$data, FUN = function(x){
+  x$marker = list(color = ~primary,
+                  line = list(color = ~secondary,
+                                        width = 1.5))
+  return(x)
+})
+
+fig
+
+  
+  
+  })
+  
+renderPlotly(bp_plotly())
+```
+
+<!---
+
+Individual Analysis
+=========================================
+
+```{r}
+
+
+points_history_plot <- reactive({
+  
+  req(nrow(filtered_player_df()) > 0)
+  
+  player_detail <- get_one_player_details(PLAYER_URL, head(filtered_player_df(), 1)$id)
+  
+ player_detail$history %>% 
+  left_join(select(teams_w_colours, id ,name), by = c("opponent_team" = "id")) %>% 
+  mutate(vs = ifelse(was_home == TRUE, paste0(name, " (H)"), paste0(name, " (A)"))) %>% 
+
+  plot_ly(type = "scatter",
+          mode = "lines+markers",
+          x = ~reorder(vs,1:nrow(.)),
+          y = ~total_points,
+          text = ~paste("Minutes: ", minutes, "<br>",
+                        "Goals: ", goals_scored, "<br>",
+                        "Assists: ", assists, "<br>")) %>% 
+  layout(xaxis = list(title = 'Opponent',
+                      zeroline = TRUE),
+         yaxis = list(title = 'Points')
+  )
+
+})
+
+renderPlotly(points_history_plot())
+
+
+```
+
+--->

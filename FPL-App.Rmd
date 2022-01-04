@@ -9,6 +9,7 @@ output:
       primary: "#37003c"
     orientation: rows
     vertical_layout: fill
+    source_code: https://github.com/j-mrph/FPL-Data-Explore
 runtime: shiny
 ---
 
@@ -20,7 +21,7 @@ library(plotly)        # CRAN v4.9.4.1
 library(scales)        # CRAN v1.1.1
 library(readr)         # CRAN v2.0.0
 
-bslib::bs_themer()
+# bslib::bs_themer()
 
 #eval(parse("testing_script.R", encoding = "UTF-8"))
 source("utility_functions.R")

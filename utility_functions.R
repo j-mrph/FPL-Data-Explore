@@ -24,11 +24,11 @@ create_team_df <- function(fpl_stats, colours_path) {
   #reading team colours csv
   team_colours <- readr::read_csv(colours_path,
                                   col_types = list(
-                                  name = col_character(),
-                                  primary = col_character(),
-                                  secondary = col_character(),
-                                  tertiary = col_character(),
-                                  id = col_double()
+                                  name = readr::col_character(),
+                                  primary = readr::col_character(),
+                                  secondary = readr::col_character(),
+                                  tertiary = readr::col_character(),
+                                  id = readr::col_double()
                                   ))
   
   teams_w_colours <- left_join(teams, select(team_colours, -name), by = "id")

@@ -131,7 +131,15 @@ source("data_prep.R")
        br(),
        HTML("Upcoming fixture difficulty: ", colour_html),
        
-       div(tags$img(src = top_val_player_png), style = "text-align: center;"),
+       # adding handling for when player photo fetching fails
+       tryCatch({
+       div(tags$img(src = top_val_player_png), style = "text-align: center;")
+       }, error = function(e) {
+       div(HTML("<i>Could not fetch player image. 
+                This can happen when the FPL site is under heavy load.</i>"),
+           style = "text-align: center;")
+       }),
+       
        style = "padding: 0px;"
      )
    ))

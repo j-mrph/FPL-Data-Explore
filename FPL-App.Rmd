@@ -106,6 +106,14 @@ source("data_prep.R")
                                                     "rgb(255, 23, 81)",
                                                     "rgb(128, 7, 45)")),
                               stringsAsFactors = FALSE)
+   
+   if(is.list(top_val_player_details$fixtures)){
+     
+     return(div(HTML("<i>Could not fetch mvp details. 
+                This can happen when the FPL site is under heavy load or undergoing     maintenance.</i>")))
+     
+   } else {
+     
 
    colour_difs <- top_val_player_details$fixtures %>%
      head(n = 5) %>%
@@ -141,9 +149,9 @@ source("data_prep.R")
        }),
        
        style = "padding: 0px;"
-     )
+     ), 
    ))
-   
+   }
  })
  
 ```
@@ -221,8 +229,8 @@ Row
 ### Player Points by Cost
 
 ```{r}
-
-
+# end of season alert
+sendSweetAlert(session, title = "Season Ended!", text = "The data in this app is sourced from the FPL API. Functionality will be limited until the API is updated for the next Premier League season. Thanks for visiting!")
 #We can estimate the bang for your buck of a FPL selection by dividing their cost by their total number points obtained this season.
 
 

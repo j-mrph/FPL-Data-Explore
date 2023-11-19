@@ -31,7 +31,7 @@ create_team_df <- function(fpl_stats, colours_path) {
                                   id = readr::col_double()
                                   ))
   
-  teams_w_colours <- left_join(teams, select(team_colours, -name), by = "id")
+  teams_w_colours <- left_join(teams, select(team_colours,-id), by = "name")
   
   # conditional colouring in case of missing elements
   teams_w_colours$secondary <- ifelse(teams_w_colours$secondary == "", teams_w_colours$primary, teams_w_colours$secondary)

@@ -20,6 +20,8 @@ library(shinyWidgets)  # CRAN v0.6.0
 library(plotly)        # CRAN v4.9.4.1
 library(scales)        # CRAN v1.1.1
 library(readr)         # CRAN v2.0.0
+library(lubridate)     # CRAN v1.8.0
+# library(dplyr)         # CRAN v1.0.7
 
 # bslib::bs_themer()
 
@@ -30,129 +32,143 @@ source("data_prep.R")
                        # creating the reactive values for plots and valueBoxes
 # main df to be filtered ----
 
- filtered_player_df <- reactive({
-
-   player_df %>%
-      filter(position %in% !!input$position_select) %>% 
-      filter(cost_abbrv >= !!input$cost_range[1] & cost_abbrv <= !!input$cost_range[2]) %>% 
-      filter(team_name %in% !!input$team_select)
-
-  })
+filtered_player_df <- reactive({
+  player_df %>%
+    filter(position %in% !!input$position_select) %>%
+    filter(cost_abbrv >= !!input$cost_range[1] &
+             cost_abbrv <= !!input$cost_range[2]) %>%
+    filter(team_name %in% !!input$team_select)
+  
+})
 
 # Value Boxes ----
- player_num <- reactive({
-   
-   req(nrow(filtered_player_df()) > 0)
-   
-   filtered_player_df() %>% 
-     count() %>% 
-     pull()
-     
- })
+player_num <- reactive({
+  req(nrow(filtered_player_df()) > 0)
+  
+  filtered_player_df() %>%
+    count() %>%
+    pull()
+  
+})
 
- avg_cost <- reactive({
- 
-   req(nrow(filtered_player_df()) > 0)
-     
-   avg <- filtered_player_df() %>% 
-     summarise(avg = mean(m_cost, na.rm = TRUE)) %>% 
-     pull() 
-   
-    scales::label_number_si(accuracy=0.1)(avg)
- })
+avg_cost <- reactive({
+  req(nrow(filtered_player_df()) > 0)
+  
+  avg <- filtered_player_df() %>%
+    summarise(avg = mean(m_cost, na.rm = TRUE)) %>%
+    pull()
+  
+  scales::label_number_si(accuracy = 0.1)(avg)
+})
  
 
- avg_points <- reactive({
-   
-   req(nrow(filtered_player_df()) > 0)
-   
-   avg <- filtered_player_df() %>% 
-     summarise(avg = mean(total_points, na.rm = TRUE)) %>% 
-     pull(avg) 
-   
-   scales::label_number_si(accuracy=0.1)(avg)
-   
- })
+avg_points <- reactive({
+  req(nrow(filtered_player_df()) > 0)
+  
+  avg <- filtered_player_df() %>%
+    summarise(avg = mean(total_points, na.rm = TRUE)) %>%
+    pull(avg)
+  
+  scales::label_number_si(accuracy = 0.1)(avg)
+  
+})
  
 # Most Valuable Player panel ----
- mvp_profile <- reactive({
-   req(nrow(filtered_player_df()) > 0)
-   
-   # filter for best value player
-   top_val_player <- filtered_player_df() %>% 
-     arrange(desc(value)) %>% 
-     head(n = 1)
-   
-   # most valuable player details for panel  
-   top_val_player_name <- 
-     top_val_player %>% 
-     pull(web_name)
-   
-   top_val_player_val <-
-     top_val_player %>% 
-     pull(value)
-   
-   top_val_player_png <-
-     top_val_player %>% 
-     pull(photo_png) 
-     
-   top_val_player_details <- 
-     get_one_player_details(PLAYER_URL, top_val_player$id)
-   #
-   difficulty_df = data.frame(rating = 1:5,
-                              colour = as.character(c("#02884e",
-                                                    "rgb(1, 252, 122)",
-                                                    "rgb(231, 231, 231)",
-                                                    "rgb(255, 23, 81)",
-                                                    "rgb(128, 7, 45)")),
-                              stringsAsFactors = FALSE)
-   
-   if(is.list(top_val_player_details$fixtures)){
-     
-     return(div(HTML("<i>Could not fetch mvp details. 
-                This can happen when the FPL site is under heavy load or undergoing     maintenance.</i>")))
-     
-   } else {
-     
-
-   colour_difs <- top_val_player_details$fixtures %>%
-     head(n = 5) %>%
-     select(difficulty) %>%
-     left_join(difficulty_df, by = c("difficulty" = "rating")) %>%
-     pull(colour)
-   
-
-   colour_html <- paste0("<p>", paste('<span style=\"color:',
-                                      colour_difs,
-                                      '\">&#9632;</span>', collapse = ""), "</p>")
+mvp_profile <- reactive({
+  req(nrow(filtered_player_df()) > 0)
+  
+  # filter for best value player
+  top_val_player <- filtered_player_df() %>%
+    arrange(desc(value)) %>%
+    head(n = 1)
+  
+  # most valuable player details for panel
+  top_val_player_name <-
+    top_val_player %>%
+    pull(web_name)
+  
+  top_val_player_val <-
+    top_val_player %>%
+    pull(value)
+  
+  top_val_player_png <-
+    top_val_player %>%
+    pull(photo_png)
+  
+  top_val_player_details <-
+    get_one_player_details(PLAYER_URL, top_val_player$id)
   #
-   
-   return(
-    tagList(
+  difficulty_df = data.frame(
+    rating = 1:5,
+    colour = as.character(
+      c(
+        "#02884e",
+        "rgb(1, 252, 122)",
+        "rgb(231, 231, 231)",
+        "rgb(255, 23, 81)",
+        "rgb(128, 7, 45)"
+      )
+    ),
+    stringsAsFactors = FALSE
+  )
+  
+  if (!is.data.frame(top_val_player_details$fixtures)) {
+    return(div(
+      HTML(
+        "<i>Could not fetch mvp details.
+                This can happen when the FPL site is under heavy load or undergoing     maintenance.</i>"
+      )
+    ))
+    
+  } else {
+    colour_difs <- top_val_player_details$fixtures %>%
+      head(n = 5) %>%
+      select(difficulty) %>%
+      left_join(difficulty_df, by = c("difficulty" = "rating")) %>%
+      pull(colour)
+    
+    
+    colour_html <- paste0(
+      "<p>",
+      paste(
+        '<span style=\"color:',
+        colour_difs,
+        '\">&#9632;</span>',
+        collapse = ""
+      ),
+      "</p>"
+    )
+    #
+    
+    return(tagList(
       br(),
-     wellPanel(
-       HTML("<b> Best value player in selection </b>"),
-       br(),
-       HTML("Name: <b>", top_val_player_name, "</b>"),
-       br(),
-       HTML("Points per £m: <b>", round(top_val_player_val, 2), "</b>"),
-       br(),
-       HTML("Upcoming fixture difficulty: ", colour_html),
-       
-       # adding handling for when player photo fetching fails
-       tryCatch({
-       div(tags$img(src = top_val_player_png), style = "text-align: center;")
-       }, error = function(e) {
-       div(HTML("<i>Could not fetch player image. 
-                This can happen when the FPL site is under heavy load.</i>"),
-           style = "text-align: center;")
-       }),
-       
-       style = "padding: 0px;"
-     ), 
-   ))
-   }
- })
+      wellPanel(
+        HTML("<b> Best value player in selection </b>"),
+        br(),
+        HTML("Name: <b>", top_val_player_name, "</b>"),
+        br(),
+        HTML("Points per £m: <b>", round(top_val_player_val, 2), "</b>"),
+        br(),
+        HTML("Upcoming fixture difficulty: ", colour_html),
+        
+        # adding handling for when player photo fetching fails
+        tryCatch({
+          div(tags$img(src = top_val_player_png), style = "text-align: center;")
+        }, error = function(e) {
+          div(
+            HTML(
+              "<i>Could not fetch player image.
+                This can happen when the FPL site is under heavy load.</i>"
+            ),
+            style = "text-align: center;"
+          )
+        }),
+        
+        style = "padding: 0px;"
+      ),
+    ))
+  }
+})
  
 ```
 
@@ -162,34 +178,47 @@ Sidebar {.sidebar data-width=260}
 
 ```{r}
 HTML('<hr style="height:1px; visibility:hidden;" />')
-shinyWidgets::pickerInput(inputId = "position_select",
-              label = "Select player position",
-              choices = c("Goalkeeper", "Defender", "Midfielder",  "Forward"),
-              selected = "Forward",
-              multiple = TRUE)
+shinyWidgets::pickerInput(
+  inputId = "position_select",
+  label = "Select player position",
+  choices = c("Goalkeeper", "Defender", "Midfielder",  "Forward"),
+  selected = "Forward",
+  multiple = TRUE
+)
 
-  shinyWidgets::pickerInput(inputId = "team_select",
-                            label = "Select Team(s)",
-                            choices = unique(player_df$team_name),
-                            selected = unique(player_df$team_name),
-                            options =
-                              list(`actions-box` = TRUE,                       `selected-text-format` = paste0("count > ", length(unique(player_df$team_name)) -1),                                          `count-selected-text` = "All"),
-                            multiple = TRUE)
+shinyWidgets::pickerInput(
+  inputId = "team_select",
+  label = "Select Team(s)",
+  choices = unique(player_df$team_name),
+  selected = unique(player_df$team_name),
+  options =
+    list(
+      `actions-box` = TRUE,
+      `selected-text-format` = paste0("count > ", length(unique(
+        player_df$team_name
+      )) - 1),
+      `count-selected-text` = "All"
+    ),
+  multiple = TRUE
+)
 
 
 
-  sliderInput("cost_range",
-              label = "Select Cost Range",
-              min = 3.5,
-              max = max(player_df$cost_abbrv, na.rm = TRUE),
-              value = c(min(player_df$cost_abbrv, na.rm = TRUE),max(player_df$cost_abbrv, na.rm = TRUE)),
-              post = "m",
-              step = 0.5
-              )
+sliderInput(
+  "cost_range",
+  label = "Select Cost Range",
+  min = 3.5,
+  max = max(player_df$cost_abbrv, na.rm = TRUE),
+  value = c(
+    min(player_df$cost_abbrv, na.rm = TRUE),
+    max(player_df$cost_abbrv, na.rm = TRUE)
+  ),
+  post = "m",
+  step = 0.5
+)
 
- renderUI(mvp_profile())
+renderUI(mvp_profile())
   
-
 
 ```
 
@@ -202,14 +231,14 @@ Row
 ### Number of Players
 ```{r}
 renderValueBox({
-valueBox(player_num(), icon = "fa-users")
+  valueBox(player_num(), icon = "fa-users")
 })
 ```
 
 ### Mean Cost
 ```{r}
 renderValueBox({
-valueBox(avg_cost(), icon = "fa-pound-sign")
+  valueBox(avg_cost(), icon = "fa-pound-sign")
 })
 ```
 
@@ -217,7 +246,7 @@ valueBox(avg_cost(), icon = "fa-pound-sign")
 ### Mean Total Points
 ```{r}
 renderValueBox({
-valueBox(avg_points(), icon = "fa-trophy")
+  valueBox(avg_points(), icon = "fa-trophy")
 })
 ```
 
@@ -229,40 +258,50 @@ Row
 ### Player Points by Cost
 
 ```{r}
-# end of season alert
-sendSweetAlert(session, title = "Season Ended!", text = "The data in this app is sourced from the FPL API. Functionality will be limited until the API is updated for the next Premier League season. Thanks for visiting!")
+
 #We can estimate the bang for your buck of a FPL selection by dividing their cost by their total number points obtained this season.
 
-
-  player_value_plot <- reactive({
-
-    req(nrow(filtered_player_df()) > 0)
-    
-    filtered_player_df() %>%
-      plot_ly(type = "scatter",
-              mode = "markers",
-              x = ~m_cost,
-              y = ~total_points,
-              #name = ~team_name,
-              text = ~paste("Name: ", web_name),
-              marker = list(size = 10,
-                            color = ~primary,
-                            line = list(color = ~secondary,
-                                        width = 1.5))) %>%
-      layout(xaxis = list(title = 'Cost (£)',
-                          zeroline = TRUE),
-             yaxis = list(title = 'Total Points')
-      )
-
-
-
-  })
-
+player_value_plot <- reactive({
+  req(nrow(filtered_player_df()) > 0)
   
-  renderPlotly(player_value_plot())
+  filtered_player_df() %>%
+    plot_ly(
+      type = "scatter",
+      mode = "markers",
+      x = ~ m_cost,
+      y = ~ total_points,
+      #name = ~team_name,
+      text = ~ paste("Name: ", web_name),
+      marker = list(
+        size = 10,
+        color = ~ primary,
+        line = list(color = ~ secondary,
+                    width = 1.5)
+      )
+    ) %>%
+    layout(
+      xaxis = list(title = 'Cost (£)',
+                   zeroline = TRUE),
+      yaxis = list(title = 'Total Points')
+    )
+  
+  
+  
+})
 
 
+renderPlotly(player_value_plot())
 
+# end of season alert
+# conditional on date
+observe({
+  req(isTruthy(player_value_plot()))
+  # TODO: Season start and end dates are released by the Premier league at different times of year
+  # Should be able to automate this better via API 
+  if (Sys.Date() %within% interval("2024-05-19", "2024-08-15")) { 
+    sendSweetAlert(session, title = "Season Ended!", text = "The data in this app is sourced from the FPL API. Functionality will be limited until the API is updated for the next Premier League season. Thanks for visiting!")
+  }
+})
 ```
 
 
@@ -273,9 +312,9 @@ Cost Distributions
 
 ```{r}
 
+
 # boxplot generation
 bp <- reactive({
-  
   req(nrow(filtered_player_df()) > 0)
   
   filtered_player_df() %>%
@@ -285,7 +324,7 @@ bp <- reactive({
     ungroup() %>%
     ggplot(aes(x = reorder(team_name, team_average_cost), y = m_cost)) +
     scale_y_continuous(label = label_number_si()) +
-    xlab("") + 
+    xlab("") +
     ylab("Cost") +
     geom_boxplot(fill = "#ADDCC8") +
     coord_flip() +
@@ -293,22 +332,24 @@ bp <- reactive({
 })
 
 bp_plotly <- reactive({
-  
   fig <- plotly_build(bp())
   
-  fig$data <- lapply(fig$data, FUN = function(x){
-  x$marker = list(color = ~primary,
-                  line = list(color = ~secondary,
-                                        width = 1.5))
-  return(x)
+  fig$data <- lapply(
+    fig$data,
+    FUN = function(x) {
+      x$marker = list(color = ~ primary,
+                      line = list(color = ~ secondary,
+                                  width = 1.5))
+      return(x)
+    }
+  )
+  
+  fig
+  
+  
+  
 })
 
-fig
-
-  
-  
-  })
-  
 renderPlotly(bp_plotly())
 ```
 

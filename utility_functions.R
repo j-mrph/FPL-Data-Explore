@@ -1,14 +1,12 @@
 
 get_fpl_stats <- function(url){
   
-  resp <- httr::GET(url,
-                    user_agent("Testing"),
-                    httr::content_type("json")
-                    )
+  req <- httr2::request(url) |>
+    httr2::req_headers(content_type = "json")
   
-  content <- httr::content(resp, as = "text", encoding = "UTF-8")
+  resp <- httr2::req_perform(req)
   
-  fpl_stats <- jsonlite::fromJSON(content,
+  fpl_stats <- httr2::resp_body_json(resp,
                                   simplifyDataFrame = TRUE,
                                   flatten = TRUE)
   
@@ -65,13 +63,13 @@ create_player_df <- function(fpl_stats, team_colours) {
     "photo"
   )
   
-  player_df <- select(elements, all_of(elements_fields)) %>%
+  player_df <- select(elements, all_of(elements_fields)) |>
     left_join(select(element_types, id, singular_name),
-              by = c("element_type" = "id")) %>%
+              by = c("element_type" = "id")) |>
     left_join(select(teams_w_colours , id, name, primary, secondary, tertiary),
-              by = c("team" = "id")) %>%
-    select(-c("team", "element_type")) %>%
-    rename(team_name = name, position = singular_name) %>%
+              by = c("team" = "id")) |>
+    select(-c("team", "element_type")) |>
+    rename(team_name = name, position = singular_name) |>
     mutate(
       cost_abbrv = now_cost / 10,
       value = total_points / cost_abbrv,
@@ -92,18 +90,16 @@ create_player_df <- function(fpl_stats, team_colours) {
 
 get_one_player_details <- function(player_url, id){
   
-  req <- paste0(player_url, id, "/")
+  req <- paste0(player_url, id, "/") |> 
+    httr2::request() |> 
+    httr2::req_headers(content_type = "json") 
+    
   
-  resp <- httr::GET(req,
-                    user_agent("Testing"),
-                    httr::content_type("json"))
+  resp <- httr2::req_perform(req)
   
-  
-  content <- httr::content(resp, as = "text", encoding = "UTF-8")
-  
-  
-  
-  player_stats <- jsonlite::fromJSON(content, simplifyDataFrame = TRUE, flatten = TRUE)
+  player_stats <-  httr2::resp_body_json(resp,
+                                         simplifyDataFrame = TRUE,
+                                         flatten = TRUE)
   
   player_stats$history$player_id <- id
   player_stats$fixtures$player_id <- id

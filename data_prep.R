@@ -1,5 +1,4 @@
-library(httr)      # CRAN v1.4.2
-library(jsonlite)  # CRAN v1.7.2
+library(httr2)      # CRAN v1.4.2
 library(dplyr)     # CRAN v1.0.7
 
 

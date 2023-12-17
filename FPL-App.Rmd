@@ -21,7 +21,6 @@ library(plotly)        # CRAN v4.9.4.1
 library(scales)        # CRAN v1.1.1
 library(readr)         # CRAN v2.0.0
 library(lubridate)     # CRAN v1.8.0
-# library(dplyr)         # CRAN v1.0.7
 
 # bslib::bs_themer()
 
@@ -33,10 +32,10 @@ source("data_prep.R")
 # main df to be filtered ----
 
 filtered_player_df <- reactive({
-  player_df %>%
-    filter(position %in% !!input$position_select) %>%
+  player_df |>
+    filter(position %in% !!input$position_select) |>
     filter(cost_abbrv >= !!input$cost_range[1] &
-             cost_abbrv <= !!input$cost_range[2]) %>%
+             cost_abbrv <= !!input$cost_range[2]) |>
     filter(team_name %in% !!input$team_select)
   
 })
@@ -45,8 +44,8 @@ filtered_player_df <- reactive({
 player_num <- reactive({
   req(nrow(filtered_player_df()) > 0)
   
-  filtered_player_df() %>%
-    count() %>%
+  filtered_player_df() |>
+    count() |>
     pull()
   
 })
@@ -54,8 +53,8 @@ player_num <- reactive({
 avg_cost <- reactive({
   req(nrow(filtered_player_df()) > 0)
   
-  avg <- filtered_player_df() %>%
-    summarise(avg = mean(m_cost, na.rm = TRUE)) %>%
+  avg <- filtered_player_df() |>
+    summarise(avg = mean(m_cost, na.rm = TRUE)) |>
     pull()
   
   scales::label_number_si(accuracy = 0.1)(avg)
@@ -65,8 +64,8 @@ avg_cost <- reactive({
 avg_points <- reactive({
   req(nrow(filtered_player_df()) > 0)
   
-  avg <- filtered_player_df() %>%
-    summarise(avg = mean(total_points, na.rm = TRUE)) %>%
+  avg <- filtered_player_df() |>
+    summarise(avg = mean(total_points, na.rm = TRUE)) |>
     pull(avg)
   
   scales::label_number_si(accuracy = 0.1)(avg)
@@ -78,21 +77,21 @@ mvp_profile <- reactive({
   req(nrow(filtered_player_df()) > 0)
   
   # filter for best value player
-  top_val_player <- filtered_player_df() %>%
-    arrange(desc(value)) %>%
+  top_val_player <- filtered_player_df() |>
+    arrange(desc(value)) |>
     head(n = 1)
   
   # most valuable player details for panel
   top_val_player_name <-
-    top_val_player %>%
+    top_val_player |>
     pull(web_name)
   
   top_val_player_val <-
-    top_val_player %>%
+    top_val_player |>
     pull(value)
   
   top_val_player_png <-
-    top_val_player %>%
+    top_val_player |>
     pull(photo_png)
   
   top_val_player_details <-
@@ -121,10 +120,10 @@ mvp_profile <- reactive({
     ))
     
   } else {
-    colour_difs <- top_val_player_details$fixtures %>%
-      head(n = 5) %>%
-      select(difficulty) %>%
-      left_join(difficulty_df, by = c("difficulty" = "rating")) %>%
+    colour_difs <- top_val_player_details$fixtures |>
+      head(n = 5) |>
+      select(difficulty) |>
+      left_join(difficulty_df, by = c("difficulty" = "rating")) |>
       pull(colour)
     
     
@@ -264,7 +263,7 @@ Row
 player_value_plot <- reactive({
   req(nrow(filtered_player_df()) > 0)
   
-  filtered_player_df() %>%
+  filtered_player_df() |>
     plot_ly(
       type = "scatter",
       mode = "markers",
@@ -278,7 +277,7 @@ player_value_plot <- reactive({
         line = list(color = ~ secondary,
                     width = 1.5)
       )
-    ) %>%
+    ) |>
     layout(
       xaxis = list(title = 'Cost (£)',
                    zeroline = TRUE),
@@ -317,11 +316,11 @@ Cost Distributions
 bp <- reactive({
   req(nrow(filtered_player_df()) > 0)
   
-  filtered_player_df() %>%
-    as.data.frame() %>%
-    dplyr::group_by(team_name) %>%
-    dplyr::mutate(team_average_cost = mean(m_cost, na.rm = TRUE)) %>%
-    ungroup() %>%
+  filtered_player_df() |>
+    as.data.frame() |>
+    dplyr::group_by(team_name) |>
+    dplyr::mutate(team_average_cost = mean(m_cost, na.rm = TRUE)) |>
+    ungroup() |>
     ggplot(aes(x = reorder(team_name, team_average_cost), y = m_cost)) +
     scale_y_continuous(label = label_number_si()) +
     xlab("") +
@@ -367,9 +366,9 @@ points_history_plot <- reactive({
   
   player_detail <- get_one_player_details(PLAYER_URL, head(filtered_player_df(), 1)$id)
   
- player_detail$history %>% 
-  left_join(select(teams_w_colours, id ,name), by = c("opponent_team" = "id")) %>% 
-  mutate(vs = ifelse(was_home == TRUE, paste0(name, " (H)"), paste0(name, " (A)"))) %>% 
+ player_detail$history |> 
+  left_join(select(teams_w_colours, id ,name), by = c("opponent_team" = "id")) |> 
+  mutate(vs = ifelse(was_home == TRUE, paste0(name, " (H)"), paste0(name, " (A)"))) |> 
 
   plot_ly(type = "scatter",
           mode = "lines+markers",
@@ -377,7 +376,7 @@ points_history_plot <- reactive({
           y = ~total_points,
           text = ~paste("Minutes: ", minutes, "<br>",
                         "Goals: ", goals_scored, "<br>",
-                        "Assists: ", assists, "<br>")) %>% 
+                        "Assists: ", assists, "<br>")) |> 
   layout(xaxis = list(title = 'Opponent',
                       zeroline = TRUE),
          yaxis = list(title = 'Points')

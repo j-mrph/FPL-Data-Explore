@@ -12,4 +12,4 @@ https://encycolorpedia.com/teams/football/epl - For most team hex codes
 
 ## Questions?
 
-Contact: jimmurphy10@protonmail.com
+Contact: jimmurphy10@proton.me
